@@ -1,0 +1,16 @@
+{
+    "name": "phoboslab/pagenode",
+    "type": "project",
+    "autoload": {
+        "psr-4": {
+            "Phoboslab\\Pagenode\\": "src/"
+        }
+    },
+    "require": {
+        "erusev/parsedown": "^1.7",
+        "ext-json": "*"
+    },
+    "require-dev": {
+        "friendsofphp/php-cs-fixer": "^3.75"
+    }
+}
