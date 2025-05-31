@@ -10,9 +10,9 @@ require 'vendor/autoload.php';
 # https://phoboslab.org
 #
 
-use Phoboslab\Pagenode\Node;
-use Phoboslab\Pagenode\Router;
-use Phoboslab\Pagenode\Selector;
+use Pagenode\Node;
+use Pagenode\Router;
+use Pagenode\Selector;
 
 const PN_VERSION = '0.1';
 

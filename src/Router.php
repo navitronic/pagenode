@@ -1,6 +1,6 @@
 <?php
 
-namespace Phoboslab\Pagenode;
+namespace Pagenode;
 
 // Router Class - handles routes and dispatch
 

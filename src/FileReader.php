@@ -1,6 +1,6 @@
 <?php
 
-namespace Phoboslab\Pagenode;
+namespace Pagenode;
 
 class FileReader
 {

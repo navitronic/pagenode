@@ -1,6 +1,6 @@
 <?php
 
-namespace Phoboslab\Pagenode;
+namespace Pagenode;
 
 /**
  * Selector - provides a query interface for Nodes on the filesystem

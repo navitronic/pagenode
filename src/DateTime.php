@@ -1,6 +1,6 @@
 <?php
 
-namespace Phoboslab\Pagenode;
+namespace Pagenode;
 
 /**
  * DateTime class - a simple wrapper for timestamps

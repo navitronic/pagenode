@@ -1,6 +1,6 @@
 <?php
 
-namespace Phoboslab\Pagenode;
+namespace Pagenode;
 
 /** Node Class - each Node instance represents a single file */
 class Node
