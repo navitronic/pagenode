@@ -1,0 +1,121 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+error_reporting(E_ALL);
+
+if (PHP_SAPI !== 'cli') {
+    fwrite(STDERR, "This script must be run from the command line.\n");
+    exit(1);
+}
+
+if (!extension_loaded('phar')) {
+    fwrite(STDERR, "The phar extension is required to build the PHAR archive.\n");
+    exit(1);
+}
+
+// Attempt to disable the readonly guard – exits if it stays enabled.
+if (ini_get('phar.readonly')) {
+    ini_set('phar.readonly', '0');
+}
+
+if (ini_get('phar.readonly')) {
+    fwrite(STDERR, "Unable to disable phar.readonly. Update your ini to allow phar creation.\n");
+    exit(1);
+}
+
+$root = __DIR__;
+$pharFile = $root . '/pagenode.phar';
+$autoloadPath = $root . '/vendor/autoload.php';
+
+if (!is_file($autoloadPath)) {
+    fwrite(STDERR, "Missing vendor/autoload.php. Install dependencies before building the PHAR.\n");
+    exit(1);
+}
+
+if (file_exists($pharFile) && !unlink($pharFile)) {
+    fwrite(STDERR, "Unable to remove existing {$pharFile}.\n");
+    exit(1);
+}
+
+$phar = new Phar($pharFile, 0, 'pagenode.phar');
+$phar->startBuffering();
+
+addFileToPhar($phar, $root . '/pagenode.php', 'pagenode.php');
+
+foreach (['src', 'vendor'] as $dir) {
+    addDirectoryToPhar($phar, $root . '/' . $dir, $dir);
+}
+
+$phar->setMetadata([
+    'created_at' => gmdate(DATE_ATOM),
+    'version' => detectVersion($root . '/pagenode.php'),
+]);
+
+$stub = <<<'PHP'
+<?php
+Phar::mapPhar('pagenode.phar');
+require 'phar://pagenode.phar/pagenode.php';
+__HALT_COMPILER();
+PHP;
+
+$phar->setStub($stub);
+$phar->setSignatureAlgorithm(Phar::SHA512);
+$phar->stopBuffering();
+
+chmod($pharFile, 0755);
+clearstatcache(true, $pharFile);
+
+$size = filesize($pharFile);
+fwrite(STDOUT, sprintf("PHAR created at %s (%s bytes)\n", basename($pharFile), $size ?? 'unknown'));
+
+/**
+ * @throws RuntimeException
+ */
+function addDirectoryToPhar(Phar $phar, string $directory, string $prefix): void
+{
+    if (!is_dir($directory)) {
+        throw new RuntimeException("Directory {$directory} does not exist.");
+    }
+
+    $iterator = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($directory, RecursiveDirectoryIterator::SKIP_DOTS)
+    );
+
+    /** @var SplFileInfo $file */
+    foreach ($iterator as $file) {
+        if ($file->isDir()) {
+            continue;
+        }
+
+        $absolutePath = $file->getPathname();
+        $relativePath = ltrim(str_replace($directory, '', $absolutePath), '/\\');
+        $pharPath = $prefix . '/' . $relativePath;
+
+        addFileToPhar($phar, $absolutePath, $pharPath);
+    }
+}
+
+function addFileToPhar(Phar $phar, string $absolutePath, string $pharPath): void
+{
+    if (!is_file($absolutePath)) {
+        throw new RuntimeException("File {$absolutePath} does not exist.");
+    }
+
+    $phar->addFile($absolutePath, $pharPath);
+}
+
+function detectVersion(string $entryFile): string
+{
+    $contents = @file_get_contents($entryFile);
+    if ($contents === false) {
+        return 'unknown';
+    }
+
+    if (preg_match("/const\\s+PN_VERSION\\s*=\\s*'([^']+)'/", $contents, $matches)) {
+        return $matches[1];
+    }
+
+    return 'unknown';
+}
