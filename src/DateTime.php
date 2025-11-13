@@ -2,24 +2,23 @@
 
 namespace Pagenode;
 
+use Stringable;
+
 /**
  * DateTime class - a simple wrapper for timestamps
  */
-class DateTime
+class DateTime implements Stringable
 {
-    protected $timestamp;
-
-    public function __construct($timestamp)
+    public function __construct(protected $timestamp)
     {
-        $this->timestamp = $timestamp;
     }
 
-    public function format($format = PN_DATE_FORMAT)
+    public function format($format = PN_DATE_FORMAT): string
     {
-        return htmlSpecialChars(date($format, $this->timestamp));
+        return htmlspecialchars(date($format, $this->timestamp));
     }
 
-    public function __toString()
+    public function __toString(): string
     {
         return $this->format();
     }

@@ -2,30 +2,31 @@
 
 namespace Pagenode;
 
+use Parsedown;
+
 /** Node Class - each Node instance represents a single file */
 class Node
 {
     public static $DebugOpenedNodes = [];
 
+    /**
+     * @var mixed[]|string
+     */
     public $keyword;
     public $tags = [];
     public $date;
-    protected $path;
-    protected $meta = [];
-    protected $body = null;
-    protected $raw = false;
+    protected array $meta;
+    protected $body;
 
-    public function __construct($path, $keyword, $meta, $raw = false)
+    public function __construct(protected $path, $keyword, array $meta, protected $raw = false)
     {
-        $this->raw = $raw;
-        $this->path = $path;
-        $this->keyword = pathInfo($path, PATHINFO_FILENAME);
-        $this->date = $raw ? $meta['date'] : new DateTime($meta['date']);
+        $this->keyword = pathinfo((string) $this->path, PATHINFO_FILENAME);
+        $this->date = $this->raw ? $meta['date'] : new DateTime($meta['date']);
         $this->meta = $meta;
 
-        if (!$raw) {
+        if (!$this->raw) {
             foreach ($meta['tags'] as $t) {
-                $this->tags[] = htmlSpecialChars($t);
+                $this->tags[] = htmlspecialchars((string) $t);
             }
         } else {
             $this->tags = $meta['tags'];
@@ -40,13 +41,13 @@ class Node
         if ($this->raw) {
             return $markdown;
         } else {
-            return !empty(PN_SYNTAX_HIGHLIGHT_LANGS)
-                ? ParsedownSyntaxHighlight::instance()->text($markdown)
-                : \Parsedown::instance()->text($markdown);
+            return PN_SYNTAX_HIGHLIGHT_LANGS === '' || PN_SYNTAX_HIGHLIGHT_LANGS === '0'
+                ? Parsedown::instance()->text($markdown)
+                : ParsedownSyntaxHighlight::instance()->text($markdown);
         }
     }
 
-    public function hasTag($tag)
+    public function hasTag($tag): bool
     {
         return in_array($tag, $this->meta['tags']);
     }
@@ -61,7 +62,7 @@ class Node
         } elseif (isset($this->meta[$name])) {
             return $this->raw
                 ? $this->meta[$name]
-                : htmlSpecialChars($this->meta[$name]);
+                : htmlspecialchars((string) $this->meta[$name]);
         }
 
         return null;

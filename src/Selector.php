@@ -9,20 +9,20 @@ class Selector
 {
     public static $DebugInfo = [];
 
-    protected $path = null;
-    protected $indexPath = null;
+    protected $path;
+    protected string $indexPath;
     protected static $IndexCache = [];
     protected static $FoundNodes = 0;
 
     public const SORT_DESC = 'desc';
     public const SORT_ASC = 'asc';
 
-    public function __construct($path)
+    public function __construct(string $path)
     {
         $this->path = realpath('./' . $path . '/');
-        if (!$this->path || strstr($path, '..') !== false) {
+        if (!$this->path || str_contains($path, '..')) {
             header("HTTP/1.1 500 Internal Error");
-            echo 'select("' . htmlSpecialChars($path) . '") does not exist.';
+            echo 'select("' . htmlspecialchars($path) . '") does not exist.';
             exit();
         }
         $this->indexPath =
@@ -30,24 +30,25 @@ class Selector
             '/pagenode-index-' . md5($this->path) . '.json';
     }
 
-    protected function rebuildIndex()
+    /**
+     * @return mixed[]
+     */
+    protected function rebuildIndex(): array
     {
         $index = [];
         foreach (glob($this->path . '/*.md') as $path) {
             $meta = $this->loadMetaFromFile($path);
             if ($meta['active'] !== false) {
-                $keyword = pathInfo($path, PATHINFO_FILENAME);
+                $keyword = pathinfo($path, PATHINFO_FILENAME);
                 $index[$keyword] = $meta;
             }
         }
 
-        if (empty($index)) {
+        if ($index === []) {
             return $index;
         }
 
-        uasort($index, function ($a, $b) {
-            return $b['date'] <=> $a['date'];
-        });
+        uasort($index, fn ($a, $b): int => $b['date'] <=> $a['date']);
 
         $jsonOpts = JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
         $json = json_encode($index, $jsonOpts);
@@ -120,20 +121,23 @@ class Selector
     public function one($params = [], $raw = false)
     {
         $nodes = $this->query('date', self::SORT_DESC, 1, $params, $raw);
-        return !empty($nodes) ? $nodes[0] : null;
+        return $nodes === [] ? null : $nodes[0];
     }
 
-    public function newest($count = 0, $params = [], $raw = false)
+    public function newest($count = 0, $params = [], $raw = false): array
     {
         return $this->query('date', self::SORT_DESC, $count, $params, $raw);
     }
 
-    public function oldest($count = 0, $params = [], $raw = false)
+    public function oldest($count = 0, $params = [], $raw = false): array
     {
         return $this->query('date', self::SORT_ASC, $count, $params, $raw);
     }
 
-    public function query($sort, $order, $count, $params, $raw = false)
+    /**
+     * @return mixed[]
+     */
+    public function query($sort, $order, $count, $params, $raw = false): array
     {
         if (!$this->path) {
             return [];
@@ -148,9 +152,9 @@ class Selector
         // by it, returning only one node.
 
         if (!empty($params['keyword'])) {
-            $index = !empty($index[$params['keyword']])
-                ? [$params['keyword'] => $index[$params['keyword']]]
-                : [];
+            $index = empty($index[$params['keyword']])
+                ? []
+                : [$params['keyword'] => $index[$params['keyword']]];
         }
 
 
@@ -161,29 +165,25 @@ class Selector
             $y = $params['date'][0] ?? $params['date'];
             $m = $params['date'][1] ?? null;
             $d = $params['date'][2] ?? null;
-            if (preg_match('/(\d{4}).(\d{2}).(\d{2})/', $y, $match)) {
+            if (preg_match('/(\d{4}).(\d{2}).(\d{2})/', (string) $y, $match)) {
                 $y = $match[1];
                 $m = $match[2];
                 $d = $match[3];
             }
-            $start = mktime(0, 0, 0, ($m ? $m : 1), ($d ? $d : 1), $y);
-            $end = mktime(23, 59, 59, ($m ? $m : 12), ($d ? $d : 31), $y);
+            $start = mktime(0, 0, 0, ($m ?: 1), ($d ?: 1), $y);
+            $end = mktime(23, 59, 59, ($m ?: 12), ($d ?: 31), $y);
 
-            $index = array_filter($index, function ($n) use ($start, $end) {
-                return $n['date'] >= $start && $n['date'] <= $end;
-            });
+            $index = array_filter($index, fn ($n): bool => $n['date'] >= $start && $n['date'] <= $end);
         }
 
 
         // Filter by tags. Only return nodes that match all given tags.
 
         if (!empty($params['tags'])) {
-            $tags = !is_array($params['tags'])
-                ? array_map('trim', explode(',', $params['tags']))
-                : $params['tags'];
-            $index = array_filter($index, function ($n) use ($tags) {
-                return !array_udiff($tags, $n['tags'], 'strcasecmp');
-            });
+            $tags = is_array($params['tags'])
+                ? $params['tags']
+                : array_map('trim', explode(',', (string) $params['tags']));
+            $index = array_filter($index, fn ($n): bool => !array_udiff($tags, $n['tags'], 'strcasecmp'));
         }
 
 
@@ -191,7 +191,7 @@ class Selector
 
         if (!empty($params['meta'])) {
             $meta = $params['meta'];
-            $index = array_filter($index, function ($n) use ($meta) {
+            $index = array_filter($index, function ($n) use ($meta): bool {
                 foreach ($meta as $key => $value) {
                     if (!isset($n[$key]) || $n[$key] !== $value) {
                         return false;
@@ -212,16 +212,10 @@ class Selector
 
         if ($sort === 'date' && $order === self::SORT_DESC) {
             // Nothing to do here; index is sorted by date, desc by default
+        } elseif ($order === self::SORT_ASC) {
+            uasort($index, fn ($a, $b): int => ($a[$sort] ?? INF) <=> ($b[$sort] ?? INF));
         } else {
-            if ($order === self::SORT_ASC) {
-                uasort($index, function ($a, $b) use ($sort) {
-                    return ($a[$sort] ?? INF) <=> ($b[$sort] ?? INF);
-                });
-            } else {
-                uasort($index, function ($a, $b) use ($sort) {
-                    return ($b[$sort] ?? 0) <=> ($a[$sort] ?? 0);
-                });
-            }
+            uasort($index, fn ($a, $b): int => ($b[$sort] ?? 0) <=> ($a[$sort] ?? 0));
         }
 
         // Keep track of the total nodes found with the given filter params

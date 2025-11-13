@@ -7,9 +7,9 @@ use Parsedown;
 /** Generic Syntax Highlighting extension for Parsedown */
 class ParsedownSyntaxHighlight extends Parsedown
 {
-    public static function SyntaxHighlight($s)
+    public static function SyntaxHighlight($s): string
     {
-        $s = htmlSpecialChars($s, ENT_COMPAT) . "\n";
+        $s = htmlspecialchars((string) $s, ENT_COMPAT) . "\n";
         $s = str_replace('\\\\', '\\\\<e>', $s); // break escaped backslashes
 
         $tokens = [];
@@ -33,7 +33,7 @@ class ParsedownSyntaxHighlight extends Parsedown
 				(?<!\\\)\'(.*?)(?<!\\\)\'|
 				(?<!\\\)<h>\/.+?(?<!\\\)\/\w*
 			)/sx'
-            => function ($m) use (&$tokens) {
+            => function ($m) use (&$tokens): string {
                 $id = '<r' . count($tokens) . '>';
                 $block = $m[1];
 
@@ -92,8 +92,8 @@ class ParsedownSyntaxHighlight extends Parsedown
 
         foreach ($transforms as $search => $replace) {
             $s = is_string($replace)
-                ? preg_replace($search, $replace, $s)
-                : preg_replace_callback($search, $replace, $s);
+                ? preg_replace($search, $replace, (string) $s)
+                : preg_replace_callback($search, $replace, (string) $s);
         }
 
         // Paste the comments and strings back in again
@@ -109,7 +109,7 @@ class ParsedownSyntaxHighlight extends Parsedown
     {
         $class = $Block['element']['element']['attributes']['class'] ?? null;
         $re = '/^language-(' . PN_SYNTAX_HIGHLIGHT_LANGS . ')$/';
-        if (empty($class) || !preg_match($re, $class)) {
+        if (empty($class) || !preg_match($re, (string) $class)) {
             return $Block;
         }
 

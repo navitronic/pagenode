@@ -1,14 +1,14 @@
 <?php
 
-require 'vendor/autoload.php';
+require __DIR__ . '/vendor/autoload.php';
 
-#
-# Pagenode
-# http://pagenode.org
-#
-# (c) Dominic Szablewski
-# https://phoboslab.org
-#
+//
+// Pagenode
+// http://pagenode.org
+//
+// (c) Dominic Szablewski
+// https://phoboslab.org
+//
 
 use Pagenode\Node;
 use Pagenode\Router;
@@ -42,20 +42,20 @@ if (!defined('PN_JSON_API_FULL_DEBUG_INFO')) {
 
 if (defined('PN_TIMEZONE')) {
     date_default_timezone_set(PN_TIMEZONE);
-} elseif (!date_default_timezone_get()) {
+} elseif (date_default_timezone_get() === '' || date_default_timezone_get() === '0') {
     date_default_timezone_set('UTC');
 }
 
 $PN_TimeStart = microtime(true);
 
 header('Content-type: text/html; charset=UTF-8');
-define('PN_ABS', rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/') . '/');
+define('PN_ABS', rtrim(str_replace('\\', '/', dirname((string) $_SERVER['SCRIPT_NAME'])), '/').'/');
 
 // -----------------------------------------------------------------------------
 // -----------------------------------------------------------------------------
 // PAGENODE Public API
 
-function select($path = '')
+function select($path = ''): Selector
 {
     return new Selector($path);
 }
@@ -65,65 +65,63 @@ function foundNodes()
     return Selector::FoundNodes();
 }
 
-function route($path, $resolver = null)
+function route($path, $resolver = null): void
 {
     Router::AddRoute($path, $resolver);
 }
 
-function reroute($source, $target)
+function reroute($source, $target): void
 {
-    route($source, function () use ($target) {
-        $args = func_get_args();
+    route($source, static function (...$args) use ($target): void {
         $target = preg_replace_callback(
             '/{(\w+)}/',
-            function ($m) use ($args) {
-                return $args[$m[1] - 1] ?? '';
-            },
-            $target
+            static fn ($m) => $args[$m[1] - 1] ?? '',
+            (string) $target,
         );
         dispatch($target);
     });
 }
 
-function redirect($path = '/', $params = [])
+function redirect(string $path = '/', $params = []): never
 {
-    $query = !empty($params)
-        ? '?' . http_build_query($params)
-        : '';
-    header('Location: ' . $path . $query);
-    exit();
+    $query = empty($params)
+        ? ''
+        : '?'.http_build_query($params);
+    header('Location: '.$path.$query);
+    exit;
 }
 
-function dispatch($request = null)
+function dispatch($request = null): void
 {
     if ($request === null) {
-        $request = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-        $request = '/' . substr($request, strlen(PN_ABS));
+        $request = parse_url((string) $_SERVER['REQUEST_URI'], PHP_URL_PATH);
+        $request = '/'.substr($request, strlen(PN_ABS));
     }
 
-    $found = Router::Dispatch($request);
+    Router::Dispatch($request);
 }
 
-function getDebugInfo()
+function getDebugInfo(): array
 {
     global $PN_TimeStart;
+
     return [
         'totalRuntime' => (microtime(true) - $PN_TimeStart) * 1000,
         'selctorInfo' => Selector::$DebugInfo,
-        'openedNodes' => Node::$DebugOpenedNodes
+        'openedNodes' => Node::$DebugOpenedNodes,
     ];
 }
 
-function printDebugInfo()
+function printDebugInfo(): void
 {
-    echo "<pre>\n" . htmlSpecialChars(print_r(getDebugInfo(), true)) . "</pre>";
+    echo "<pre>\n".htmlspecialchars(print_r(getDebugInfo(), true)).'</pre>';
 }
 
 // -----------------------------------------------------------------------------
 // PAGENODE JSON Route, disabled by default
 
 if (defined('PN_JSON_API_PATH')) {
-    route(PN_JSON_API_PATH, function () {
+    route(PN_JSON_API_PATH, static function (): void {
         $nodes = select($_GET['path'] ?? '')->query(
             $_GET['sort'] ?? 'date',
             $_GET['order'] ?? 'desc',
@@ -133,27 +131,29 @@ if (defined('PN_JSON_API_PATH')) {
                 'date' => $_GET['date'] ?? null,
                 'tags' => $_GET['tags'] ?? null,
                 'meta' => $_GET['meta'] ?? null,
-                'page' => $_GET['page'] ?? null
+                'page' => $_GET['page'] ?? null,
             ],
-            true
+            true,
         );
 
-        $fields = !empty($_GET['fields'])
-            ? array_map('trim', explode(',', $_GET['fields']))
-            : ['keyword'];
+        $fields = empty($_GET['fields'])
+            ? ['keyword']
+            : array_map('trim', explode(',', (string) $_GET['fields']));
 
         header('Content-type: application/json; charset=UTF-8');
         echo json_encode([
-            'nodes' => array_map(function ($n) use ($fields) {
+            'nodes' => array_map(static function ($n) use ($fields) {
                 $ret = [];
+
                 foreach ($fields as $f) {
-                    $ret[$f] = $n->$f;
+                    $ret[$f] = $n->{$f};
                 }
+
                 return $ret;
             }, $nodes),
             'info' => PN_JSON_API_FULL_DEBUG_INFO
                 ? getDebugInfo()
-                : ['totalRuntime' => getDebugInfo()['totalRuntime']]
+                : ['totalRuntime' => getDebugInfo()['totalRuntime']],
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
     });
 }

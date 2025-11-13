@@ -14,7 +14,7 @@ class FileReader
         return self::ReadFile($path)[1];
     }
 
-    private static function ReadFile($path)
+    private static function ReadFile($path): array
     {
         $meta = [];
         $file = file_get_contents($path);
@@ -33,12 +33,12 @@ class FileReader
             }
         }
 
-        $meta['tags'] = !empty($meta['tags'])
-            ? array_map('trim', explode(',', $meta['tags']))
-            : [];
+        $meta['tags'] = empty($meta['tags'])
+            ? []
+            : array_map('trim', explode(',', $meta['tags']));
 
         if (
-            !empty($meta['date']) &&
+            isset($meta['date']) && ($meta['date'] !== '' && $meta['date'] !== '0' && $meta['date'] !== []) &&
             preg_match(
                 '/(\d{4})[\.\-](\d{2})[\.\-](\d{2})( (\d{2}):(\d{2}))?/',
                 $meta['date'],
@@ -48,8 +48,8 @@ class FileReader
             $y = $dateMatch[1];
             $m = $dateMatch[2];
             $d = $dateMatch[3];
-            $h = !empty($dateMatch[5]) ? $dateMatch[5] : 0;
-            $i = !empty($dateMatch[6]) ? $dateMatch[6] : 0;
+            $h = empty($dateMatch[5]) ? 0 : $dateMatch[5];
+            $i = empty($dateMatch[6]) ? 0 : $dateMatch[6];
             $meta['date'] = mktime($h, $i, 0, $m, $d, $y);
         } else {
             $meta['date'] = filemtime($path);

@@ -26,8 +26,8 @@ if (ini_get('phar.readonly')) {
 }
 
 $root = __DIR__;
-$pharFile = $root . '/pagenode.phar';
-$autoloadPath = $root . '/vendor/autoload.php';
+$pharFile = $root.'/pagenode.phar';
+$autoloadPath = $root.'/vendor/autoload.php';
 
 if (!is_file($autoloadPath)) {
     fwrite(STDERR, "Missing vendor/autoload.php. Install dependencies before building the PHAR.\n");
@@ -42,15 +42,15 @@ if (file_exists($pharFile) && !unlink($pharFile)) {
 $phar = new Phar($pharFile, 0, 'pagenode.phar');
 $phar->startBuffering();
 
-addFileToPhar($phar, $root . '/pagenode.php', 'pagenode.php');
+addFileToPhar($phar, $root.'/pagenode.php', 'pagenode.php');
 
 foreach (['src', 'vendor'] as $dir) {
-    addDirectoryToPhar($phar, $root . '/' . $dir, $dir);
+    addDirectoryToPhar($phar, $root.'/'.$dir, $dir);
 }
 
 $phar->setMetadata([
     'created_at' => gmdate(DATE_ATOM),
-    'version' => detectVersion($root . '/pagenode.php'),
+    'version' => detectVersion($root.'/pagenode.php'),
 ]);
 
 $stub = <<<'PHP'
@@ -80,7 +80,7 @@ function addDirectoryToPhar(Phar $phar, string $directory, string $prefix): void
     }
 
     $iterator = new RecursiveIteratorIterator(
-        new RecursiveDirectoryIterator($directory, RecursiveDirectoryIterator::SKIP_DOTS)
+        new RecursiveDirectoryIterator($directory, RecursiveDirectoryIterator::SKIP_DOTS),
     );
 
     /** @var SplFileInfo $file */
@@ -91,7 +91,7 @@ function addDirectoryToPhar(Phar $phar, string $directory, string $prefix): void
 
         $absolutePath = $file->getPathname();
         $relativePath = ltrim(str_replace($directory, '', $absolutePath), '/\\');
-        $pharPath = $prefix . '/' . $relativePath;
+        $pharPath = $prefix.'/'.$relativePath;
 
         addFileToPhar($phar, $absolutePath, $pharPath);
     }
@@ -109,6 +109,7 @@ function addFileToPhar(Phar $phar, string $absolutePath, string $pharPath): void
 function detectVersion(string $entryFile): string
 {
     $contents = @file_get_contents($entryFile);
+
     if ($contents === false) {
         return 'unknown';
     }

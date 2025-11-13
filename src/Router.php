@@ -8,7 +8,7 @@ class Router
 {
     public static $Routes = [];
 
-    public static function AddRoute($path, $resolver)
+    public static function AddRoute($path, $resolver): void
     {
         $r = str_replace('/', '\\/', $path);
         $r = str_replace('*', '.*?', $r);
@@ -24,7 +24,7 @@ class Router
     public static function Dispatch($request)
     {
         foreach (self::$Routes as $path => $r) {
-            if (preg_match($r['regexp'], $request, $m)) {
+            if (preg_match($r['regexp'], (string) $request, $m)) {
                 $found = self::Resolve($r['resolver'], $m);
                 return ($found && $path !== '/*');
             }
@@ -34,9 +34,7 @@ class Router
 
     public static function Resolve($resolver, $regexpMatch, $recurse = true)
     {
-        $params = array_filter($regexpMatch, function ($key) {
-            return !is_int($key);
-        }, ARRAY_FILTER_USE_KEY);
+        $params = array_filter($regexpMatch, fn ($key): bool => !is_int($key), ARRAY_FILTER_USE_KEY);
 
         if (call_user_func_array($resolver, $params) !== false) {
             return true;
@@ -45,7 +43,7 @@ class Router
         return self::ErrorNotFound($recurse);
     }
 
-    public static function ErrorNotFound($recurse = true)
+    public static function ErrorNotFound($recurse = true): bool
     {
         if ($recurse && !empty(self::$Routes['/*'])) {
             self::Resolve(self::$Routes['/*']['resolver'], [], false);

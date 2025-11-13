@@ -7,10 +7,18 @@
         }
     },
     "require": {
+        "php": "^8.2",
         "erusev/parsedown": "^1.7",
         "ext-json": "*"
     },
     "require-dev": {
-        "friendsofphp/php-cs-fixer": "^3.75"
+        "friendsofphp/php-cs-fixer": "^3.75",
+        "rector/rector": "^1.2"
+    },
+    "scripts": {
+        "cs:lint": "PHP_CS_FIXER_IGNORE_ENV=1 vendor/bin/php-cs-fixer fix --dry-run --diff",
+        "cs:fix": "PHP_CS_FIXER_IGNORE_ENV=1 vendor/bin/php-cs-fixer fix",
+        "rector:check": "vendor/bin/rector --dry-run",
+        "rector:fix": "vendor/bin/rector"
     }
 }
