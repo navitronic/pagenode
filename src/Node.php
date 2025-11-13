@@ -1,69 +1,56 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Pagenode;
+
+use DateTimeImmutable;
 
 /** Node Class - each Node instance represents a single file */
 class Node
 {
-    public static $DebugOpenedNodes = [];
+    /** @var string[] */
+    public static array $DebugOpenedNodes = [];
 
-    public $keyword;
-    public $tags = [];
-    public $date;
-    protected $path;
-    protected $meta = [];
-    protected $body = null;
-    protected $raw = false;
+    protected ?string $body = null;
 
-    public function __construct($path, $keyword, $meta, $raw = false)
-    {
-        $this->raw = $raw;
-        $this->path = $path;
-        $this->keyword = pathInfo($path, PATHINFO_FILENAME);
-        $this->date = $raw ? $meta['date'] : new DateTime($meta['date']);
-        $this->meta = $meta;
-
-        if (!$raw) {
-            foreach ($meta['tags'] as $t) {
-                $this->tags[] = htmlSpecialChars($t);
-            }
-        } else {
-            $this->tags = $meta['tags'];
-        }
+    /**
+     * @param array<string, mixed> $meta
+     * @param string[] $tags
+     * @param callable $bodyLoader
+     */
+    public function __construct(
+        private string $path,
+        public string $keyword,
+        public array $tags,
+        protected array $meta,
+        public DateTimeImmutable|int $date,
+        protected bool $raw,
+        private $bodyLoader
+    ) {
     }
 
-    protected function loadBody()
+    public function hasTag(string $tag): bool
     {
-        self::$DebugOpenedNodes[] = $this->path;
-        $markdown = FileReader::ReadContent($this->path);
-
-        if ($this->raw) {
-            return $markdown;
-        } else {
-            return !empty(PN_SYNTAX_HIGHLIGHT_LANGS)
-                ? ParsedownSyntaxHighlight::instance()->text($markdown)
-                : \Parsedown::instance()->text($markdown);
-        }
+        return in_array($tag, $this->tags, true);
     }
 
-    public function hasTag($tag)
-    {
-        return in_array($tag, $this->meta['tags']);
-    }
-
-    public function __get($name)
+    public function __get(string $name): mixed
     {
         if ($name === 'body') {
-            if (!$this->body) {
+            if ($this->body === null) {
                 $this->body = $this->loadBody();
             }
             return $this->body;
-        } elseif (isset($this->meta[$name])) {
-            return $this->raw
-                ? $this->meta[$name]
-                : htmlSpecialChars($this->meta[$name]);
         }
 
-        return null;
+        return $this->meta[$name] ?? null;
+    }
+
+    protected function loadBody(): string
+    {
+        self::$DebugOpenedNodes[] = $this->path;
+        $loader = $this->bodyLoader;
+        return $loader();
     }
 }

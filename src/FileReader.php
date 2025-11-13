@@ -1,66 +1,38 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Pagenode;
 
+use Pagenode\Content\FrontMatterParser;
+use Pagenode\Content\MarkdownDocumentLoader;
+
+/**
+ * @deprecated Use MarkdownDocumentLoader directly instead.
+ */
 class FileReader
 {
-    public static function ReadMeta($path)
+    private static ?MarkdownDocumentLoader $loader = null;
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function ReadMeta(string $path): array
     {
-        return self::ReadFile($path)[0];
+        return self::loader()->load($path)->meta();
     }
 
-    public static function ReadContent($path)
+    public static function ReadContent(string $path): string
     {
-        return self::ReadFile($path)[1];
+        return self::loader()->load($path)->body();
     }
 
-    private static function ReadFile($path)
+    private static function loader(): MarkdownDocumentLoader
     {
-        $meta = [];
-        $file = file_get_contents($path);
-
-        $lines = preg_split('/\R/', $file);
-
-        if ($lines[0] === '---') {
-            array_shift($lines);
-            $file = implode("\n", $lines);
+        if (self::$loader === null) {
+            self::$loader = new MarkdownDocumentLoader(new FrontMatterParser());
         }
 
-        if (preg_match('/(.*?)^---\s*$/ms', $file, $metaSection)) {
-            preg_match_all('/^(\w+):(.*)$/m', $metaSection[1], $metaAttribs);
-            foreach ($metaAttribs[1] as $i => $key) {
-                $meta[$key] = trim($metaAttribs[2][$i]);
-            }
-        }
-
-        $meta['tags'] = !empty($meta['tags'])
-            ? array_map('trim', explode(',', $meta['tags']))
-            : [];
-
-        if (
-            !empty($meta['date']) &&
-            preg_match(
-                '/(\d{4})[\.\-](\d{2})[\.\-](\d{2})( (\d{2}):(\d{2}))?/',
-                $meta['date'],
-                $dateMatch
-            )
-        ) {
-            $y = $dateMatch[1];
-            $m = $dateMatch[2];
-            $d = $dateMatch[3];
-            $h = !empty($dateMatch[5]) ? $dateMatch[5] : 0;
-            $i = !empty($dateMatch[6]) ? $dateMatch[6] : 0;
-            $meta['date'] = mktime($h, $i, 0, $m, $d, $y);
-        } else {
-            $meta['date'] = filemtime($path);
-        }
-
-        $meta['active'] = empty($meta['active']) || $meta['active'] !== 'false';
-
-        $markdown = (preg_match('/^---\s*$(.*)/ms', $file, $m))
-            ? $m[1]
-            : $file;
-
-        return [$meta, $markdown];
+        return self::$loader;
     }
 }

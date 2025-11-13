@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Pagenode;
 
 use Parsedown;
@@ -7,9 +9,9 @@ use Parsedown;
 /** Generic Syntax Highlighting extension for Parsedown */
 class ParsedownSyntaxHighlight extends Parsedown
 {
-    public static function SyntaxHighlight($s)
+    public static function SyntaxHighlight(string $s): string
     {
-        $s = htmlSpecialChars($s, ENT_COMPAT) . "\n";
+        $s = htmlspecialchars($s, ENT_COMPAT) . "\n";
         $s = str_replace('\\\\', '\\\\<e>', $s); // break escaped backslashes
 
         $tokens = [];
@@ -91,9 +93,15 @@ class ParsedownSyntaxHighlight extends Parsedown
         ];
 
         foreach ($transforms as $search => $replace) {
-            $s = is_string($replace)
+            $result = is_string($replace)
                 ? preg_replace($search, $replace, $s)
                 : preg_replace_callback($search, $replace, $s);
+
+            if ($result === null) {
+                continue;
+            }
+
+            $s = $result;
         }
 
         // Paste the comments and strings back in again
@@ -105,7 +113,11 @@ class ParsedownSyntaxHighlight extends Parsedown
         return trim($s, "\n\r");
     }
 
-    protected function blockFencedCodeComplete($Block)
+    /**
+     * @param array<string, mixed> $Block
+     * @return array<string, mixed>
+     */
+    protected function blockFencedCodeComplete(array $Block): array
     {
         $class = $Block['element']['element']['attributes']['class'] ?? null;
         $re = '/^language-(' . PN_SYNTAX_HIGHLIGHT_LANGS . ')$/';

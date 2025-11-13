@@ -1,58 +1,105 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Pagenode;
 
-// Router Class - handles routes and dispatch
+use FastRoute\Dispatcher;
+use FastRoute\RouteCollector;
+use function FastRoute\simpleDispatcher;
 
+// Router Class - handles routes and dispatch
 class Router
 {
-    public static $Routes = [];
+    /**
+     * @var array<int, array{path: string, resolver: callable}>
+     */
+    private static array $routes = [];
 
-    public static function AddRoute($path, $resolver)
+    /**
+     * @var callable|null
+     */
+    private static $fallbackResolver = null;
+
+    private static ?Dispatcher $dispatcher = null;
+
+    public static function AddRoute(string $path, callable $resolver): void
     {
-        $r = str_replace('/', '\\/', $path);
-        $r = str_replace('*', '.*?', $r);
-        $r = preg_replace('/{(\w+)}/', '(?<$1>[^\\/]+?)', $r);
-        $regexp = '/^' . $r . '$/';
+        if ($path === '/*') {
+            self::$fallbackResolver = $resolver;
+            return;
+        }
 
-        self::$Routes[$path] = [
-            'regexp' => $regexp,
+        self::$routes[] = [
+            'path' => $path,
             'resolver' => $resolver
         ];
+        self::$dispatcher = null;
     }
 
-    public static function Dispatch($request)
+    public static function Dispatch(string $request): bool
     {
-        foreach (self::$Routes as $path => $r) {
-            if (preg_match($r['regexp'], $request, $m)) {
-                $found = self::Resolve($r['resolver'], $m);
-                return ($found && $path !== '/*');
-            }
+        $dispatcher = self::dispatcher();
+        $routeInfo = $dispatcher->dispatch('GET', $request);
+
+        if ($routeInfo[0] === Dispatcher::FOUND) {
+            $resolver = $routeInfo[1];
+            $params = $routeInfo[2];
+            return self::Resolve($resolver, $params);
         }
+
         return self::ErrorNotFound();
     }
 
-    public static function Resolve($resolver, $regexpMatch, $recurse = true)
+    /**
+     * @param array<string, mixed> $regexpMatch
+     */
+    public static function Resolve(callable $resolver, array $regexpMatch, bool $recurse = true): bool
     {
-        $params = array_filter($regexpMatch, function ($key) {
-            return !is_int($key);
-        }, ARRAY_FILTER_USE_KEY);
-
-        if (call_user_func_array($resolver, $params) !== false) {
+        if (call_user_func_array($resolver, $regexpMatch) !== false) {
             return true;
-        };
+        }
 
         return self::ErrorNotFound($recurse);
     }
 
-    public static function ErrorNotFound($recurse = true)
+    public static function ErrorNotFound(bool $recurse = true): bool
     {
-        if ($recurse && !empty(self::$Routes['/*'])) {
-            self::Resolve(self::$Routes['/*']['resolver'], [], false);
+        if ($recurse && self::$fallbackResolver) {
+            self::Resolve(self::$fallbackResolver, [], false);
         } else {
-            header("HTTP/1.1 404 Not Found");
-            echo "Not Found";
+            header('HTTP/1.1 404 Not Found');
+            echo 'Not Found';
         }
         return false;
+    }
+
+    private static function dispatcher(): Dispatcher
+    {
+        if (self::$dispatcher !== null) {
+            return self::$dispatcher;
+        }
+
+        self::$dispatcher = simpleDispatcher(function (RouteCollector $collector) {
+            foreach (self::$routes as $route) {
+                $pattern = self::normalizePattern($route['path']);
+                $collector->addRoute('GET', $pattern, $route['resolver']);
+            }
+        });
+
+        return self::$dispatcher;
+    }
+
+    private static function normalizePattern(string $path): string
+    {
+        $wildcardIndex = 0;
+
+        return preg_replace_callback(
+            '/\*/',
+            static function () use (&$wildcardIndex) {
+                return '{__wildcard' . $wildcardIndex++ . ':.*}';
+            },
+            $path
+        ) ?? $path;
     }
 }
